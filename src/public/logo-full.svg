@@ -1,0 +1,19 @@
+<svg width="200" height="80" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Logo Text QE -->
+  <text x="10" y="55" font-family="Arial, sans-serif" font-weight="bold" font-size="48" fill="#4f7cff">QE</text>
+  
+  <!-- Logo Text .tn -->
+  <text x="92" y="55" font-family="Arial, sans-serif" font-weight="bold" font-size="48" fill="#ff8f00">.tn</text>
+  
+  <!-- ECG Line -->
+  <g transform="translate(10, 60)">
+    <path
+      d="M0 10 L20 10 L25 0 L30 20 L35 10 L40 10 L45 5 L50 15 L55 10 L100 10"
+      stroke="#059669"
+      stroke-width="2.5"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>
