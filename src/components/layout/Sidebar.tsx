@@ -78,6 +78,11 @@ const navItems: NavItem[] = [
     icon: Shield,
     path: '/superadmin',
   },
+  {
+    label: 'Gestion des rôles',
+    icon: Shield,
+    path: '/role-manager',
+  },
 ];
 
 const secondaryNavItems: NavItem[] = [

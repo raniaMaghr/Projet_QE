@@ -17,6 +17,7 @@ import {
   SeriesPage,
   CustomQCMPage,
 } from './pages';
+import RoleManager from './pages/SuperAdmin/RoleManager';
 import { SuperAdminDashboard } from './pages/SuperAdmin';
 import UploadPage from './components/UploadPage';
 import SeriesPageWrapper from './pages/SeriesPageWrapper';
@@ -112,6 +113,7 @@ function AppRoutes() {
         element={<RoleProtectedRoute allowedRoles={["admin", "superAdmin"]}><MainLayout /></RoleProtectedRoute>}
       >
         <Route path="/superadmin" element={<SuperAdminDashboard />} />
+          <Route path="/role-manager" element={<RoleManager />} />
         <Route path="/tutorials" element={<div>Tutoriels — Admin only</div>} />
         <Route path="/stats" element={<StatsPageWrapper />} />
         <Route

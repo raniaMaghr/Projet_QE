@@ -33,7 +33,7 @@ export default function UsersList({
 
   useEffect(() => {
     let isMounted = true;
-    
+
     async function loadData() {
       try {
         const { data: profiles, error: supabaseError } = await supabase
@@ -42,7 +42,7 @@ export default function UsersList({
           .order('created_at', { ascending: false });
 
         if (!isMounted) return;
-        
+
         if (supabaseError) {
           setError(supabaseError.message);
           setUsers([]);
@@ -57,7 +57,10 @@ export default function UsersList({
       }
     }
 
+    // Always attempt to load data immediately (other pages do this on mount).
+    setLoading(true);
     loadData();
+
     return () => { isMounted = false; };
   }, [reloadKey]);
 

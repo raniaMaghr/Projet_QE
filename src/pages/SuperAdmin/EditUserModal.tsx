@@ -21,7 +21,7 @@ function EditUserModal({ user, onClose, onSaved }: Props) {
   const [firstName, setFirstName] = useState(user.first_name || '');
   const [lastName, setLastName] = useState(user.last_name || '');
   const [faculty, setFaculty] = useState(user.faculty || 'FMT');
-  const [year, setYear] = useState<number | null>(user.year || 1);
+  const [year, setYear] = useState<number | null>(user.year ?? null);
   const [role, setRole] = useState(user.role || 'student');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,13 +32,17 @@ function EditUserModal({ user, onClose, onSaved }: Props) {
     setLoading(true);
 
     try {
+      // coerce year to allowed values (1,2,3) or null to avoid DB check constraint errors
+      const allowedYears = [1, 2, 3];
+      const payloadYear = year !== null && allowedYears.includes(Number(year)) ? Number(year) : null;
+
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
           first_name: firstName || null,
           last_name: lastName || null,
           faculty: faculty || null,
-          year: year !== null ? year : null,
+          year: payloadYear,
           role: role,
           updated_at: new Date().toISOString(),
         })
@@ -107,17 +111,17 @@ function EditUserModal({ user, onClose, onSaved }: Props) {
               <label className="block text-sm mb-1">Année</label>
               <select
                 className="w-full border rounded-xl px-3 py-2"
-                value={year !== null ? year : ''}
+                value={year !== null ? String(year) : ''}
                 onChange={e => {
                   const val = e.target.value;
-                  if (val === 'DFG') setYear(null);
+                  if (val === '') setYear(null);
                   else setYear(Number(val));
                 }}
               >
                 <option value={1}>J1</option>
                 <option value={2}>J2</option>
                 <option value={3}>J3</option>
-                <option value="DFG">DFG</option>
+                <option value="">DFG</option>
               </select>
             </div>
           </div>
