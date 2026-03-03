@@ -33,7 +33,7 @@ export default function UsersList({
 
   useEffect(() => {
     let isMounted = true;
-
+    
     async function loadData() {
       try {
         const { data: profiles, error: supabaseError } = await supabase
@@ -42,7 +42,7 @@ export default function UsersList({
           .order('created_at', { ascending: false });
 
         if (!isMounted) return;
-
+        
         if (supabaseError) {
           setError(supabaseError.message);
           setUsers([]);
@@ -57,10 +57,7 @@ export default function UsersList({
       }
     }
 
-    // Always attempt to load data immediately (other pages do this on mount).
-    setLoading(true);
     loadData();
-
     return () => { isMounted = false; };
   }, [reloadKey]);
 
@@ -111,9 +108,9 @@ export default function UsersList({
   return (
     <div className="space-y-4">
       {/* Desktop Table */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      <div className="hidden md:block overflow-x-auto rounded-lg">
+        <table className="min-w-full divide-y divide-slate-200 rounded-lg">
+          <thead style={{ backgroundColor: '#fff9f2' }}>
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Prénom</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Nom</th>
@@ -151,17 +148,14 @@ export default function UsersList({
                   <div className="flex items-center justify-center gap-2">
                     <button
                       onClick={() => onEdit(u)}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      title="Modifier"
-                    >
-                      <Pencil className="w-4 h-4" />
+                      className="p-1.5" title="Modifier">
+                      <Pencil className="w-4 h-4" style={{ color: '#ff8f00' }} />
                     </button>
                     <button
                       onClick={() => onDelete(u.id)}
                       className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="w-4 h-4" />
+                      title="Supprimer">
+                      <Trash2 className="w-4 h-4" style={{ color: 'red' }} />
                     </button>
                   </div>
                 </td>
@@ -197,16 +191,16 @@ export default function UsersList({
             <div className="flex gap-2 pt-2 border-t border-slate-100">
               <button
                 onClick={() => onEdit(u)}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
               >
-                <Pencil className="w-4 h-4" />
+                <Pencil className="w-4 h-4" style={{ color: '#ff8f00' }} />
                 Modifier
               </button>
               <button
                 onClick={() => onDelete(u.id)}
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-4 h-4" style={{ color: 'red' }} />
                 Supprimer
               </button>
             </div>

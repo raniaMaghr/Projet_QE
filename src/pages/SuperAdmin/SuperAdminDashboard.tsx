@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import UsersList from './UsersList';
-import { useAuth } from '../../contexts';
 import CreateUserModal from './CreateUserModal';
 import EditUserModal from './EditUserModal';
 import { supabase } from '../../lib/supabase';
@@ -35,11 +34,14 @@ export default function SuperAdminDashboard(): JSX.Element {
   const handleDelete = async (userId: string) => {
     try {
       setDeleteLoading(true);
+      
       const { error } = await supabase
         .from('profiles')
         .delete()
         .eq('id', userId);
+
       if (error) throw error;
+
       setReloadKey(k => k + 1);
       setShowDeleteConfirm(null);
     } catch (error: any) {
@@ -50,15 +52,10 @@ export default function SuperAdminDashboard(): JSX.Element {
     }
   };
 
-  const auth = useAuth();
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Debug - auth status (temporary) */}
-        <div className="text-xs text-slate-500">
-          Auth: loading={String(auth.loading)} authenticated={String(auth.isAuthenticated)} userId={auth.user?.id ?? 'null'}
-        </div>
+        
         {/* Header */}
         <div className="space-y-4">
           <div>
@@ -66,10 +63,12 @@ export default function SuperAdminDashboard(): JSX.Element {
               Super Admin
             </h1>
           </div>
+          
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <p className="text-sm sm:text-base text-slate-600">
               Gestion des utilisateurs
             </p>
+            
             <button
               onClick={() => setShowCreate(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg shadow-sm hover:bg-primary/90 hover:shadow-md transition-all duration-200 font-medium text-sm sm:text-base w-full sm:w-auto"
@@ -91,6 +90,7 @@ export default function SuperAdminDashboard(): JSX.Element {
                 className="w-full pl-4 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
               />
             </div>
+            
             <select
               value={searchField}
               onChange={e => setSearchField(e.target.value)}
@@ -117,6 +117,7 @@ export default function SuperAdminDashboard(): JSX.Element {
             onDelete={(userId) => setShowDeleteConfirm(userId)}
           />
         </div>
+
       </div>
 
       {/* Create User Modal */}
