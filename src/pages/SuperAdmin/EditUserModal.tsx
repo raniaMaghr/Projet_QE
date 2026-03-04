@@ -21,7 +21,7 @@ function EditUserModal({ user, onClose, onSaved }: Props) {
   const [firstName, setFirstName] = useState(user.first_name || '');
   const [lastName, setLastName] = useState(user.last_name || '');
   const [faculty, setFaculty] = useState(user.faculty || 'FMT');
-  const [year, setYear] = useState<number | null>(user.year ?? null);
+  const [calendarYear, setCalendarYear] = useState<number | null>(user.year ?? null);
   const [role, setRole] = useState(user.role || 'student');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +32,8 @@ function EditUserModal({ user, onClose, onSaved }: Props) {
     setLoading(true);
 
     try {
-      // coerce year to allowed values (1,2,3) or null to avoid DB check constraint errors
-      const allowedYears = [1, 2, 3];
-      const payloadYear = year !== null && allowedYears.includes(Number(year)) ? Number(year) : null;
+      // validate calendar year for DB CHECK constraint (2000-2100)
+      const payloadYear = calendarYear !== null && Number(calendarYear) >= 2000 && Number(calendarYear) <= 2100 ? Number(calendarYear) : null;
 
       const { error: updateError } = await supabase
         .from('profiles')
@@ -111,17 +110,17 @@ function EditUserModal({ user, onClose, onSaved }: Props) {
               <label className="block text-sm mb-1">Année</label>
               <select
                 className="w-full border rounded-xl px-3 py-2"
-                value={year !== null ? String(year) : ''}
+                value={calendarYear !== null ? String(calendarYear) : ''}
                 onChange={e => {
                   const val = e.target.value;
-                  if (val === '') setYear(null);
-                  else setYear(Number(val));
+                  if (val === '') setCalendarYear(null);
+                  else setCalendarYear(Number(val));
                 }}
               >
-                <option value={1}>J1</option>
-                <option value={2}>J2</option>
-                <option value={3}>J3</option>
-                <option value="">DFG</option>
+                <option value="">2000-2100</option>
+                {Array.from({ length: 2100 - 2000 + 1 }, (_, i) => 2000 + i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
               </select>
             </div>
           </div>

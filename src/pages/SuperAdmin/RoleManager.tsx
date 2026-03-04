@@ -286,7 +286,7 @@ export default function RoleManager() {
                           {profile.last_name || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                          {profile.year ? `J${profile.year}` : '-'}
+                          {profile.year ? String(profile.year) : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <select
@@ -330,7 +330,7 @@ export default function RoleManager() {
                           {profile.first_name} {profile.last_name}
                         </h3>
                         <p className="text-sm text-slate-600 mt-1">
-                          Année: {profile.year ? `J${profile.year}` : '-'}
+                          Année: {profile.year ? String(profile.year) : '-'}
                         </p>
                       </div>
                     </div>

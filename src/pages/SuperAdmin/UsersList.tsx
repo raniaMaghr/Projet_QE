@@ -133,11 +133,11 @@ export default function UsersList({
                   {u.email || '-'}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">
-                  {u.year ? `J${u.year}` : '-'}
+                  {typeof u.year === 'number' ? String(u.year) : '-'}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    u.role === 'superAdmin' ? 'bg-purple-100 text-purple-800' :
+                    u.role === '' ? 'bg-purple-100 text-purple-800' :
                     u.role === 'admin' ? 'bg-blue-100 text-blue-800' :
                     'bg-slate-100 text-slate-800'
                   }`}>
@@ -176,7 +176,7 @@ export default function UsersList({
                 </h3>
                 <p className="text-sm text-slate-600">{u.email || '-'}</p>
                 <p className="text-sm text-slate-600 mt-1">
-                  Année: {u.year ? `J${u.year}` : '-'}
+                  Année: {typeof u.year === 'number' ? String(u.year) : '-'}
                 </p>
               </div>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
