@@ -9,8 +9,19 @@ import {
 } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, Heart, Brain, Stethoscope } from "lucide-react";
+import { ChevronLeft, Heart, Brain, Stethoscope, ChevronRight } from "lucide-react";
 import { getSpecialtiesByLevel, getCoursesBySpecialtyAndLevel, getSeriesByCourseYearFaculty } from '@/supabaseService';
+
+function getSpecialtyIcon(name: string) {
+  const n = name.toLowerCase();
+  if (n.includes('cardio') || n.includes('cardiologie')) return '❤️';
+  if (n.includes('gyn') || n.includes('obst')) return '👶';
+  if (n.includes('psychi') || n.includes('psychiatrie')) return '🧠';
+  if (n.includes('chir') || n.includes('chirurgie')) return '🏥';
+  if (n.includes('neuro') || n.includes('neurologie')) return '🧠';
+  if (n.includes('pediatrie') || n.includes('pédiatrie')) return '👶';
+  return '📚';
+}
 
 export function SeriesPage() {
   const [activeTab, setActiveTab] = useState("j1");
@@ -20,6 +31,7 @@ export function SeriesPage() {
 
   // --- Mode1 dynamic navigation state ---
   const [specialties, setSpecialties] = useState<string[]>([]);
+  const [specialtiesWithCount, setSpecialtiesWithCount] = useState<{ name: string; count: number }[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const [courses, setCourses] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
@@ -44,6 +56,18 @@ export function SeriesPage() {
     try {
       const specs = await getSpecialtiesByLevel(level);
       setSpecialties(specs);
+      // charger les counts pour l'affichage (optimisable)
+      const counts = await Promise.all(
+        specs.map(async (s) => {
+          try {
+            const cs = await getCoursesBySpecialtyAndLevel(s, level);
+            return { name: s, count: cs.length };
+          } catch (e) {
+            return { name: s, count: 0 };
+          }
+        })
+      );
+      setSpecialtiesWithCount(counts);
     } catch (err) {
       console.error('Erreur loading specialties', err);
     } finally {
@@ -271,15 +295,22 @@ export function SeriesPage() {
               {loading && specialties.length === 0 ? (
                 <div>Chargement...</div>
               ) : (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {specialties.map(s => (
-                    <button
-                      key={s}
-                      className={`px-3 py-1 rounded border ${selectedSpecialty === s ? 'bg-primary text-white' : 'bg-white'}`}
-                      onClick={() => onSelectSpecialty(s)}
-                    >
-                      {s}
-                    </button>
+                <div className="space-y-4 mt-4">
+                  {specialtiesWithCount.map(spec => (
+                    <Card key={spec.name} className={`shadow-sm rounded-lg`} onClick={() => onSelectSpecialty(spec.name)}>
+                      <CardContent className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-4">
+                          <div className="text-3xl">{getSpecialtyIcon(spec.name)}</div>
+                          <div>
+                            <h4 className="font-semibold">{spec.name}</h4>
+                            <div className="text-sm text-muted-foreground">{spec.count} cours</div>
+                          </div>
+                        </div>
+                        <div>
+                          <Button variant="default">EXPLORER</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               )}
@@ -287,24 +318,26 @@ export function SeriesPage() {
 
             {selectedSpecialty && (
               <div className="mb-4">
-                <h4 className="font-medium">Cours — {selectedSpecialty}</h4>
-                {loading && courses.length === 0 ? (
-                  <div>Chargement...</div>
-                ) : (
-                  <div className="grid gap-4 mt-2">
-                    {courses.map((course, idx) => (
-                      <Card key={course.id || idx} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => onSelectCourse(course)}>
-                        <CardContent className="p-6 flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold text-lg mb-1">{course.name || course.title}</h3>
-                            <Badge variant="secondary" className="font-normal">{course.bank_size ?? '—'} cours</Badge>
-                          </div>
-                          <Button>Choisir</Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                <h4 className="font-medium">{getSpecialtyIcon(selectedSpecialty)} {selectedSpecialty}</h4>
+                <p className="text-muted-foreground">Sélectionnez un cours pour voir les séries QCM disponibles</p>
+
+                <div className="space-y-3 mt-4">
+                  {loading && courses.length === 0 ? (
+                    <div>Chargement...</div>
+                  ) : (
+                    courses.map((course, idx) => (
+                      <div key={course.id || idx} className="p-4 rounded-lg bg-white shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-md bg-slate-100 flex items-center justify-center text-sm font-semibold text-primary">{(course.id || idx + 1).toString().slice(0,2)}</div>
+                          <div>{course.name || course.title}</div>
+                        </div>
+                        <div>
+                          <Button variant="default" onClick={() => onSelectCourse(course)}>EXPLORER <ChevronRight className="ml-2" /></Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
 
@@ -359,22 +392,28 @@ export function SeriesPage() {
 
         {/* -------- J2 -------- */}
         <TabsContent value="j2" className="space-y-4">
-          {/* Réutilise la même UI que pour J1 mais activeTab est j2, ce qui déclenche le chargement pour J2 */}
           <div>
             <div className="mb-4">
               <h3 className="font-medium">Spécialités (Jour 2)</h3>
               {loading && specialties.length === 0 ? (
                 <div>Chargement...</div>
               ) : (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {specialties.map(s => (
-                    <button
-                      key={s}
-                      className={`px-3 py-1 rounded border ${selectedSpecialty === s ? 'bg-primary text-white' : 'bg-white'}`}
-                      onClick={() => onSelectSpecialty(s)}
-                    >
-                      {s}
-                    </button>
+                <div className="space-y-4 mt-4">
+                  {specialtiesWithCount.map(spec => (
+                    <Card key={spec.name} className={`shadow-sm rounded-lg`} onClick={() => onSelectSpecialty(spec.name)}>
+                      <CardContent className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-4">
+                          <div className="text-3xl">{getSpecialtyIcon(spec.name)}</div>
+                          <div>
+                            <h4 className="font-semibold">{spec.name}</h4>
+                            <div className="text-sm text-muted-foreground">{spec.count} cours</div>
+                          </div>
+                        </div>
+                        <div>
+                          <Button variant="default">EXPLORER</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               )}
@@ -382,69 +421,24 @@ export function SeriesPage() {
 
             {selectedSpecialty && (
               <div className="mb-4">
-                <h4 className="font-medium">Cours — {selectedSpecialty}</h4>
-                {loading && courses.length === 0 ? (
-                  <div>Chargement...</div>
-                ) : (
-                  <div className="grid gap-4 mt-2">
-                    {courses.map((course, idx) => (
-                      <Card key={course.id || idx} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => onSelectCourse(course)}>
-                        <CardContent className="p-6 flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold text-lg mb-1">{course.name || course.title}</h3>
-                            <Badge variant="secondary" className="font-normal">{course.bank_size ?? '—'} cours</Badge>
-                          </div>
-                          <Button>Choisir</Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                <h4 className="font-medium">{getSpecialtyIcon(selectedSpecialty)} {selectedSpecialty}</h4>
+                <p className="text-muted-foreground">Sélectionnez un cours pour voir les séries QCM disponibles</p>
 
-            {selectedCourse && (
-              <div className="mb-4">
-                <h4 className="font-medium">Filtrer séries pour: {selectedCourse.name || selectedCourse.title}</h4>
-                <div className="flex gap-2 items-center mt-2">
-                  <label>Année:</label>
-                  <select value={year} onChange={e => setYear(e.target.value)} className="px-2 py-1 border rounded">
-                    <option value="2022">2022</option>
-                    <option value="2023">2023</option>
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                  </select>
-
-                  <label>Faculté:</label>
-                  <select value={faculty} onChange={e => setFaculty(e.target.value)} className="px-2 py-1 border rounded">
-                    <option value="FMS">FMS</option>
-                    <option value="FMT">FMT</option>
-                    <option value="FMM">FMM</option>
-                    <option value="FMSf">FMSf</option>
-                  </select>
-
-                  <Button onClick={loadSeriesForSelectedCourse}>Charger séries</Button>
-                </div>
-
-                <div className="mt-4">
-                  {loading ? (
-                    <div>Chargement séries...</div>
-                  ) : series.length === 0 ? (
-                    <div>Aucune série trouvée pour ces filtres</div>
+                <div className="space-y-3 mt-4">
+                  {loading && courses.length === 0 ? (
+                    <div>Chargement...</div>
                   ) : (
-                    <div className="space-y-2">
-                      {series.map(s => (
-                        <div key={s.id} className="p-3 border rounded flex justify-between items-center">
-                          <div>
-                            <div className="font-medium">{s.objective}</div>
-                            <div className="text-sm text-muted-foreground">{s.faculty} — {s.year}</div>
-                          </div>
-                          <div>
-                            <Button size="sm" onClick={() => console.log('Start series', s.id)}>Explorer</Button>
-                          </div>
+                    courses.map((course, idx) => (
+                      <div key={course.id || idx} className="p-4 rounded-lg bg-white shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-md bg-slate-100 flex items-center justify-center text-sm font-semibold text-primary">{(course.id || idx + 1).toString().slice(0,2)}</div>
+                          <div>{course.name || course.title}</div>
                         </div>
-                      ))}
-                    </div>
+                        <div>
+                          <Button variant="default" onClick={() => onSelectCourse(course)}>EXPLORER <ChevronRight className="ml-2" /></Button>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
