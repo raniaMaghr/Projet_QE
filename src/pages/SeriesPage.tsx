@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -10,12 +10,80 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Heart, Brain, Stethoscope } from "lucide-react";
+import { getSpecialtiesByLevel, getCoursesBySpecialtyAndLevel, getSeriesByCourseYearFaculty } from '@/supabaseService';
 
 export function SeriesPage() {
   const [activeTab, setActiveTab] = useState("j1");
   const navigate = useNavigate();
 
   const goBack = () => navigate("/dashboard");
+
+  // --- Mode1 dynamic navigation state ---
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
+  const [year, setYear] = useState<string>('2024');
+  const [faculty, setFaculty] = useState<string>('FMS');
+  const [series, setSeries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // When tab changes, reload specialties for the corresponding level
+    const level = activeTab === 'j1' ? 'J1' : 'J2';
+    loadSpecialties(level);
+    // reset selections
+    setSelectedSpecialty(null);
+    setCourses([]);
+    setSelectedCourse(null);
+    setSeries([]);
+  }, [activeTab]);
+
+  async function loadSpecialties(level: string) {
+    setLoading(true);
+    try {
+      const specs = await getSpecialtiesByLevel(level);
+      setSpecialties(specs);
+    } catch (err) {
+      console.error('Erreur loading specialties', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onSelectSpecialty(spec: string) {
+    setSelectedSpecialty(spec);
+    setLoading(true);
+    try {
+      const level = activeTab === 'j1' ? 'J1' : 'J2';
+      const cs = await getCoursesBySpecialtyAndLevel(spec, level);
+      setCourses(cs);
+      setSelectedCourse(null);
+      setSeries([]);
+    } catch (err) {
+      console.error('Erreur loading courses', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onSelectCourse(course: any) {
+    setSelectedCourse(course);
+    setSeries([]);
+  }
+
+  async function loadSeriesForSelectedCourse() {
+    if (!selectedCourse) return;
+    setLoading(true);
+    try {
+      const s = await getSeriesByCourseYearFaculty(selectedCourse.name || selectedCourse.title || selectedCourse.shortTitle, year, faculty);
+      setSeries(s);
+    } catch (err) {
+      console.error('Erreur loading series', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const goToCourse = (day: string, key: string) => {
     navigate(`/train/series/${day}/${key}`);
@@ -197,77 +265,190 @@ export function SeriesPage() {
 
         {/* -------- J1 -------- */}
         <TabsContent value="j1" className="space-y-4">
-          <div className="grid gap-4">
-            {j1Courses.map((course, index) => (
-              <Card
-                key={index}
-                className="hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => goToCourse("j1", course.key)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="text-3xl">
-                        {course.icon}
-                      </div>
+          <div>
+            <div className="mb-4">
+              <h3 className="font-medium">Spécialités (Jour 1)</h3>
+              {loading && specialties.length === 0 ? (
+                <div>Chargement...</div>
+              ) : (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {specialties.map(s => (
+                    <button
+                      key={s}
+                      className={`px-3 py-1 rounded border ${selectedSpecialty === s ? 'bg-primary text-white' : 'bg-white'}`}
+                      onClick={() => onSelectSpecialty(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-                      <div>
-                        <h3 className="font-semibold text-lg mb-1">
-                          {course.title}
-                        </h3>
-
-                        <Badge
-                          variant="secondary"
-                          className="font-normal"
-                        >
-                          6 cours
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <Button>EXPLORER</Button>
+            {selectedSpecialty && (
+              <div className="mb-4">
+                <h4 className="font-medium">Cours — {selectedSpecialty}</h4>
+                {loading && courses.length === 0 ? (
+                  <div>Chargement...</div>
+                ) : (
+                  <div className="grid gap-4 mt-2">
+                    {courses.map((course, idx) => (
+                      <Card key={course.id || idx} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => onSelectCourse(course)}>
+                        <CardContent className="p-6 flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg mb-1">{course.name || course.title}</h3>
+                            <Badge variant="secondary" className="font-normal">{course.bank_size ?? '—'} cours</Badge>
+                          </div>
+                          <Button>Choisir</Button>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                )}
+              </div>
+            )}
+
+            {selectedCourse && (
+              <div className="mb-4">
+                <h4 className="font-medium">Filtrer séries pour: {selectedCourse.name || selectedCourse.title}</h4>
+                <div className="flex gap-2 items-center mt-2">
+                  <label>Année:</label>
+                  <select value={year} onChange={e => setYear(e.target.value)} className="px-2 py-1 border rounded">
+                    <option value="2022">2022</option>
+                    <option value="2023">2023</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                  </select>
+
+                  <label>Faculté:</label>
+                  <select value={faculty} onChange={e => setFaculty(e.target.value)} className="px-2 py-1 border rounded">
+                    <option value="FMS">FMS</option>
+                    <option value="FMT">FMT</option>
+                    <option value="FMM">FMM</option>
+                    <option value="FMSf">FMSf</option>
+                  </select>
+
+                  <Button onClick={loadSeriesForSelectedCourse}>Charger séries</Button>
+                </div>
+
+                <div className="mt-4">
+                  {loading ? (
+                    <div>Chargement séries...</div>
+                  ) : series.length === 0 ? (
+                    <div>Aucune série trouvée pour ces filtres</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {series.map(s => (
+                        <div key={s.id} className="p-3 border rounded flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">{s.objective}</div>
+                            <div className="text-sm text-muted-foreground">{s.faculty} — {s.year}</div>
+                          </div>
+                          <div>
+                            <Button size="sm" onClick={() => console.log('Start series', s.id)}>Explorer</Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
         {/* -------- J2 -------- */}
         <TabsContent value="j2" className="space-y-4">
-          <div className="grid gap-4">
-            {j2Courses.map((course, index) => (
-              <Card
-                key={index}
-                className="hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => goToCourse("j2", course.key)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="text-3xl">
-                        {course.icon}
-                      </div>
+          {/* Réutilise la même UI que pour J1 mais activeTab est j2, ce qui déclenche le chargement pour J2 */}
+          <div>
+            <div className="mb-4">
+              <h3 className="font-medium">Spécialités (Jour 2)</h3>
+              {loading && specialties.length === 0 ? (
+                <div>Chargement...</div>
+              ) : (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {specialties.map(s => (
+                    <button
+                      key={s}
+                      className={`px-3 py-1 rounded border ${selectedSpecialty === s ? 'bg-primary text-white' : 'bg-white'}`}
+                      onClick={() => onSelectSpecialty(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-                      <div>
-                        <h3 className="font-semibold text-lg mb-1">
-                          {course.title}
-                        </h3>
-
-                        <Badge
-                          variant="secondary"
-                          className="font-normal"
-                        >
-                          8 cours
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <Button>EXPLORER</Button>
+            {selectedSpecialty && (
+              <div className="mb-4">
+                <h4 className="font-medium">Cours — {selectedSpecialty}</h4>
+                {loading && courses.length === 0 ? (
+                  <div>Chargement...</div>
+                ) : (
+                  <div className="grid gap-4 mt-2">
+                    {courses.map((course, idx) => (
+                      <Card key={course.id || idx} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => onSelectCourse(course)}>
+                        <CardContent className="p-6 flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg mb-1">{course.name || course.title}</h3>
+                            <Badge variant="secondary" className="font-normal">{course.bank_size ?? '—'} cours</Badge>
+                          </div>
+                          <Button>Choisir</Button>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                )}
+              </div>
+            )}
+
+            {selectedCourse && (
+              <div className="mb-4">
+                <h4 className="font-medium">Filtrer séries pour: {selectedCourse.name || selectedCourse.title}</h4>
+                <div className="flex gap-2 items-center mt-2">
+                  <label>Année:</label>
+                  <select value={year} onChange={e => setYear(e.target.value)} className="px-2 py-1 border rounded">
+                    <option value="2022">2022</option>
+                    <option value="2023">2023</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                  </select>
+
+                  <label>Faculté:</label>
+                  <select value={faculty} onChange={e => setFaculty(e.target.value)} className="px-2 py-1 border rounded">
+                    <option value="FMS">FMS</option>
+                    <option value="FMT">FMT</option>
+                    <option value="FMM">FMM</option>
+                    <option value="FMSf">FMSf</option>
+                  </select>
+
+                  <Button onClick={loadSeriesForSelectedCourse}>Charger séries</Button>
+                </div>
+
+                <div className="mt-4">
+                  {loading ? (
+                    <div>Chargement séries...</div>
+                  ) : series.length === 0 ? (
+                    <div>Aucune série trouvée pour ces filtres</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {series.map(s => (
+                        <div key={s.id} className="p-3 border rounded flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">{s.objective}</div>
+                            <div className="text-sm text-muted-foreground">{s.faculty} — {s.year}</div>
+                          </div>
+                          <div>
+                            <Button size="sm" onClick={() => console.log('Start series', s.id)}>Explorer</Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

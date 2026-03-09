@@ -289,3 +289,58 @@ export async function loadSeriesFromSupabase(seriesId: string): Promise<{
     throw error;
   }
 }
+
+// ===== NAVIGATION MODE 1: SÉRIES PAR ANNÉE/FACULTÉ =====
+
+export interface CourseRow {
+  id: string;
+  name: string;
+  specialty: string;
+  level: string;
+  bank_size?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Retourne la liste des spécialités distinctes pour un niveau donné (J1|J2)
+ */
+export async function getSpecialtiesByLevel(level: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('specialty')
+    .eq('level', level);
+
+  if (error) throw error;
+  const specialties = (data || []).map((r: any) => r.specialty).filter(Boolean);
+  // dédupliquer
+  return Array.from(new Set(specialties));
+}
+
+export async function getCoursesBySpecialtyAndLevel(specialty: string, level: string): Promise<CourseRow[]> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('specialty', specialty)
+    .eq('level', level)
+    .order('name', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Récupère les séries QCM filtrées par `objective` (nom du cours), `year` et `faculty`.
+ */
+export async function getSeriesByCourseYearFaculty(courseName: string, year: string, faculty: string) {
+  const { data, error } = await supabase
+    .from('qcm_series')
+    .select('*')
+    .eq('objective', courseName)
+    .eq('year', year)
+    .eq('faculty', faculty)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
