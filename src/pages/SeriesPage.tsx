@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Heart, Brain, Stethoscope, ChevronRight } from "lucide-react";
 import { getSpecialtiesByLevel, getCoursesBySpecialtyAndLevel, getSeriesByCourseYearFaculty } from '@/supabaseService';
+import { useAuth } from '@/contexts';
 
 function getSpecialtyIcon(name: string) {
   const n = name.toLowerCase();
@@ -40,8 +41,13 @@ export function SeriesPage() {
   const [series, setSeries] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const { loading: authLoading, isAuthenticated } = useAuth();
+
   useEffect(() => {
-    // When tab changes, reload specialties for the corresponding level
+    // Wait for auth initialization to complete before querying Supabase
+    if (authLoading) return;
+    if (!isAuthenticated) return;
+
     const level = activeTab === 'j1' ? 'J1' : 'J2';
     loadSpecialties(level);
     // reset selections
@@ -49,7 +55,7 @@ export function SeriesPage() {
     setCourses([]);
     setSelectedCourse(null);
     setSeries([]);
-  }, [activeTab]);
+  }, [activeTab, authLoading, isAuthenticated]);
 
   async function loadSpecialties(level: string) {
     setLoading(true);
@@ -332,7 +338,7 @@ export function SeriesPage() {
                           <div>{course.name || course.title}</div>
                         </div>
                         <div>
-                          <Button variant="default" onClick={() => onSelectCourse(course)}>EXPLORER <ChevronRight className="ml-2" /></Button>
+                          <Button variant="default" onClick={() => navigate(`/train/series/course/${course.id || course.key}`)}>EXPLORER <ChevronRight className="ml-2" /></Button>
                         </div>
                       </div>
                     ))

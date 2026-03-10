@@ -17,6 +17,7 @@ import {
   SeriesPage,
   CustomQCMPage,
 } from './pages';
+import CourseSeriesPage from './pages/CourseSeriesPage';
 import RoleManager from './pages/SuperAdmin/RoleManager';
 import { SuperAdminDashboard } from './pages/SuperAdmin';
 import UploadPage from './components/UploadPage';
@@ -100,6 +101,7 @@ function AppRoutes() {
         <Route path="/learn/summaries" element={<div className="p-8 text-center">Résumés — En développement</div>} />
         <Route path="/planning"        element={<div className="p-8 text-center">Planning — En développement</div>} />
         <Route path="/train/series"    element={<SeriesPage />} />
+        <Route path="/train/series/course/:courseId" element={<CourseSeriesPage />} />
         <Route path="/train/custom"    element={<CustomQCMPage />} />
         <Route path="/exam"            element={<div className="p-8 text-center">Examens Blancs — En développement</div>} />
         <Route path="/blog"            element={<div className="p-8 text-center">Blog — En développement</div>} />

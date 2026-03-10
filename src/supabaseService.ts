@@ -306,15 +306,24 @@ export interface CourseRow {
  * Retourne la liste des spécialités distinctes pour un niveau donné (J1|J2)
  */
 export async function getSpecialtiesByLevel(level: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('specialty')
-    .eq('level', level);
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('specialty')
+      .eq('level', level);
 
-  if (error) throw error;
-  const specialties = (data || []).map((r: any) => r.specialty).filter(Boolean);
-  // dédupliquer
-  return Array.from(new Set(specialties));
+    if (error) {
+      console.error('getSpecialtiesByLevel error', error);
+      throw error;
+    }
+
+    const specialties = (data || []).map((r: any) => r.specialty).filter(Boolean);
+    // dédupliquer
+    return Array.from(new Set(specialties));
+  } catch (err) {
+    console.error('getSpecialtiesByLevel exception', err);
+    return [];
+  }
 }
 
 export async function getCoursesBySpecialtyAndLevel(specialty: string, level: string): Promise<CourseRow[]> {
@@ -327,6 +336,25 @@ export async function getCoursesBySpecialtyAndLevel(specialty: string, level: st
 
   if (error) throw error;
   return data || [];
+}
+
+export async function getCourseById(courseId: string): Promise<CourseRow | null> {
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', courseId)
+      .single();
+
+    if (error) {
+      console.error('getCourseById error', error);
+      throw error;
+    }
+    return data || null;
+  } catch (err) {
+    console.error('getCourseById exception', err);
+    return null;
+  }
 }
 
 /**
