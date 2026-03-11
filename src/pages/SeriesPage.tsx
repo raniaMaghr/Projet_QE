@@ -10,8 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Heart, Brain, Stethoscope, ChevronRight } from "lucide-react";
-import { getSpecialtiesByLevel, getCoursesBySpecialtyAndLevel, getSeriesByCourseYearFaculty } from '@/supabaseService';
-import { useAuth } from '@/contexts';
+import { getSpecialtiesByLevel, getCoursesBySpecialtyAndLevel, getSeriesByCourseYearFaculty, getSeriesOverviewByCourse } from '@/supabaseService';
 
 function getSpecialtyIcon(name: string) {
   const n = name.toLowerCase();
@@ -39,15 +38,17 @@ export function SeriesPage() {
   const [year, setYear] = useState<string>('2024');
   const [faculty, setFaculty] = useState<string>('FMS');
   const [series, setSeries] = useState<any[]>([]);
+  const [seriesOverview, setSeriesOverview] = useState<{ year: string; faculties: { faculty: string; count: number }[] }[]>([]);
+  const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({});
+
+  function toggleYearExpand(year: string) {
+    setExpandedYears(prev => ({ ...prev, [year]: !prev[year] }));
+  }
   const [loading, setLoading] = useState(false);
 
-  const { loading: authLoading, isAuthenticated } = useAuth();
-
   useEffect(() => {
-    // Wait for auth initialization to complete before querying Supabase
-    if (authLoading) return;
-    if (!isAuthenticated) return;
-
+    // Charger les spécialités pour l'onglet actif (J1/J2) sans exiger
+    // que l'utilisateur soit authentifié — les listes sont publiques.
     const level = activeTab === 'j1' ? 'J1' : 'J2';
     loadSpecialties(level);
     // reset selections
@@ -55,7 +56,7 @@ export function SeriesPage() {
     setCourses([]);
     setSelectedCourse(null);
     setSeries([]);
-  }, [activeTab, authLoading, isAuthenticated]);
+  }, [activeTab]);
 
   async function loadSpecialties(level: string) {
     setLoading(true);
@@ -98,8 +99,45 @@ export function SeriesPage() {
   }
 
   async function onSelectCourse(course: any) {
+    // When user selects a course, load the overview (years → faculties)
     setSelectedCourse(course);
     setSeries([]);
+    setSeriesOverview([]);
+    await loadSeriesOverviewForCourse(course);
+  }
+
+  async function loadSeriesOverviewForCourse(course: any) {
+    if (!course) return;
+    setLoading(true);
+    try {
+      const courseName = course.name || course.title || course.shortTitle;
+      const rows = await getSeriesOverviewByCourse(courseName);
+
+      // Group rows by year then faculty and count
+      const map: Record<string, Record<string, number>> = {};
+      (rows || []).forEach((r: any) => {
+        const y = r.year || 'Unknown';
+        const f = r.faculty || 'N/A';
+        map[y] = map[y] || {};
+        map[y][f] = (map[y][f] || 0) + 1;
+      });
+
+      const years = Object.keys(map).sort((a, b) => (b > a ? 1 : -1));
+      const overview = years.map(y => ({
+        year: y,
+        faculties: Object.keys(map[y]).map(f => ({ faculty: f, count: map[y][f] }))
+      }));
+
+      setSeriesOverview(overview);
+      // expand all years by default so faculties are visible immediately
+      const expandState: Record<string, boolean> = {};
+      years.forEach(y => { expandState[y] = true; });
+      setExpandedYears(expandState);
+    } catch (err) {
+      console.error('Erreur loading series overview', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadSeriesForSelectedCourse() {
@@ -119,222 +157,107 @@ export function SeriesPage() {
     navigate(`/train/series/${day}/${key}`);
   };
 
-  // ---------------- J1 ----------------
-  const j1Courses = [
-    {
-      icon: <Heart className="h-6 w-6 text-red-500" />,
-      title: "Cardiologie – Chirurgie cardio-vasculaire",
-      shortTitle: "Cardio-CCV",
-      progress: "78%",
-      chapters: "6 chapitres",
-      key: "cardio-ccv",
-    },
-    {
-      icon: "👶",
-      title: "Gynécologie – Obstétrique",
-      shortTitle: "Gynéco-Obs",
-      progress: "65%",
-      chapters: "6 chapitres",
-      key: "gyneco",
-    },
-    {
-      icon: <Brain className="h-6 w-6 text-purple-500" />,
-      title: "Psychiatrie",
-      shortTitle: "Psychiatrie",
-      progress: "42%",
-      chapters: "10 chapitres",
-      key: "psychiatrie",
-    },
-    {
-      icon: "🏥",
-      title: "Chirurgie générale",
-      shortTitle: "Chirurgie",
-      progress: "38%",
-      chapters: "6 chapitres",
-      key: "chirurgie",
-    },
-    {
-      icon: "🫄",
-      title: "Gastro-entérologie",
-      shortTitle: "Gastro",
-      progress: "55%",
-      chapters: "5 chapitres",
-      key: "gastro",
-    },
-    {
-      icon: <Brain className="h-6 w-6 text-blue-500" />,
-      title: "Neurologie",
-      shortTitle: "Neurologie",
-      progress: "33%",
-      chapters: "16 chapitres",
-      key: "neurologie",
-    },
-    {
-      icon: "👁️",
-      title: "ORL – Ophtalmologie",
-      shortTitle: "ORL-Ophta",
-      progress: "47%",
-      chapters: "11 chapitres",
-      key: "orl-ophta",
-    },
-    {
-      icon: <Stethoscope className="h-6 w-6 text-green-500" />,
-      title: "Pneumologie",
-      shortTitle: "Pneumo",
-      progress: "72%",
-      chapters: "9 chapitres",
-      key: "pneumo",
-    },
-  ];
-
-  // -------------------------
-  // Données J2
-  // -------------------------
-  const j2Courses = [
-    {
-      icon: "🧬",
-      title: "Endocrinologie",
-      shortTitle: "Endocrino",
-      progress: "62%",
-      chapters: "6 chapitres",
-      key: "endocrino",
-    },
-    {
-      icon: "🦠",
-      title: "Maladies infectieuses",
-      shortTitle: "Infectieux",
-      progress: "28%",
-      chapters: "17 chapitres",
-      key: "infectieux",
-    },
-    {
-      icon: "🫘",
-      title: "Néphrologie",
-      shortTitle: "Néphro",
-      progress: "44%",
-      chapters: "10 chapitres",
-      key: "nephro",
-    },
-    {
-      icon: "🦴",
-      title: "Orthopédie – Rhumatologie",
-      shortTitle: "Ortho-Rhumato",
-      progress: "36%",
-      chapters: "20 chapitres",
-      key: "ortho-rhumato",
-    },
-    {
-      icon: "🚨",
-      title: "Réanimation",
-      shortTitle: "Réanimation",
-      progress: "58%",
-      chapters: "8 chapitres",
-      key: "reanimation",
-    },
-    {
-      icon: "🩸",
-      title: "Hématologie",
-      shortTitle: "Hémato",
-      progress: "41%",
-      chapters: "5 chapitres",
-      key: "hemato",
-    },
-    {
-      icon: "👶",
-      title: "Pédiatrie",
-      shortTitle: "Pédiatrie",
-      progress: "67%",
-      chapters: "22 chapitres",
-      key: "pediatrie",
-    },
-    {
-      icon: "🫸",
-      title: "Urologie",
-      shortTitle: "Urologie",
-      progress: "29%",
-      chapters: "9 chapitres",
-      key: "urologie",
-    },
-  ];
 
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={goBack}
-              className="hidden md:flex"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+      {!selectedSpecialty && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goBack}
+                className="hidden md:flex"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
 
-            <h1 className="text-2xl font-semibold">
-              📚 QCM Par Séries
-            </h1>
-          </div>
+              <h1 className="text-2xl font-semibold">
+                📚 QCM Par Séries
+              </h1>
+            </div>
 
-          <p className="text-muted-foreground">
-            Navigation : J1/J2 → Spécialité → Cours → Année → Faculté → Séries
-          </p>
-        </CardContent>
-      </Card>
+            <p className="text-muted-foreground">
+              Navigation : J1/J2 → Spécialité → Cours → Année → Faculté → Séries
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 h-14">
-          <TabsTrigger value="j1" className="text-base">
-            Jour 1
-          </TabsTrigger>
-          <TabsTrigger value="j2" className="text-base">
-            Jour 2
-          </TabsTrigger>
-        </TabsList>
+        {!selectedSpecialty && (
+          <TabsList className="grid w-full grid-cols-2 h-14">
+            <TabsTrigger value="j1" className="text-base">
+              Jour 1
+            </TabsTrigger>
+            <TabsTrigger value="j2" className="text-base">
+              Jour 2
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         {/* -------- J1 -------- */}
         <TabsContent value="j1" className="space-y-4">
           <div>
-            <div className="mb-4">
-              <h3 className="font-medium">Spécialités (Jour 1)</h3>
-              {loading && specialties.length === 0 ? (
-                <div>Chargement...</div>
-              ) : (
-                <div className="space-y-4 mt-4">
-                  {specialtiesWithCount.map(spec => (
-                    <Card key={spec.name} className={`shadow-sm rounded-lg`} onClick={() => onSelectSpecialty(spec.name)}>
-                      <CardContent className="flex items-center justify-between p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="text-3xl">{getSpecialtyIcon(spec.name)}</div>
-                          <div>
-                            <h4 className="font-semibold">{spec.name}</h4>
-                            <div className="text-sm text-muted-foreground">{spec.count} cours</div>
+            {!selectedSpecialty && (
+              <div className="mb-4">
+                <h3 className="font-medium">Spécialités (Jour 1)</h3>
+                {loading && specialties.length === 0 ? (
+                  <div>Chargement...</div>
+                ) : specialtiesWithCount.length === 0 ? (
+                  <div>Aucune spécialité trouvée</div>
+                ) : (
+                  <div className="space-y-4 mt-4">
+                    {specialtiesWithCount.map(spec => (
+                      <Card key={spec.name} className={`shadow-sm rounded-lg`} onClick={() => onSelectSpecialty(spec.name)}>
+                        <CardContent className="flex items-center justify-between p-4">
+                          <div className="flex items-center gap-4">
+                            <div className="text-3xl">{getSpecialtyIcon(spec.name)}</div>
+                            <div>
+                              <h4 className="font-semibold">{spec.name}</h4>
+                              <div className="text-sm text-muted-foreground">{spec.count} cours</div>
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <Button variant="default">EXPLORER</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+                          <div>
+                            <Button variant="default">EXPLORER</Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {selectedSpecialty && (
               <div className="mb-4">
-                <h4 className="font-medium">{getSpecialtyIcon(selectedSpecialty)} {selectedSpecialty}</h4>
-                <p className="text-muted-foreground">Sélectionnez un cours pour voir les séries QCM disponibles</p>
+                <Card className="shadow-sm rounded-lg">
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-4">
+                      <Button variant="outline" size="icon" onClick={() => { setSelectedSpecialty(null); setCourses([]); setSeries([]); }}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="text-2xl">{getSpecialtyIcon(selectedSpecialty)}</div>
+                      <div>
+                        <h4 className="font-semibold">{selectedSpecialty}</h4>
+                        <p className="text-sm text-muted-foreground">Sélectionnez un cours pour voir les séries QCM disponibles</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <div className="space-y-3 mt-4">
                   {loading && courses.length === 0 ? (
                     <div>Chargement...</div>
+                  ) : courses.length === 0 ? (
+                    <div>Aucun cours trouvé pour cette spécialité</div>
                   ) : (
                     courses.map((course, idx) => (
                       <div key={course.id || idx} className="p-4 rounded-lg bg-white shadow-sm flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-md bg-slate-100 flex items-center justify-center text-sm font-semibold text-primary">{(course.id || idx + 1).toString().slice(0,2)}</div>
+                          <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold">{(idx + 1)}</div>
                           <div>{course.name || course.title}</div>
                         </div>
                         <div>
@@ -349,34 +272,67 @@ export function SeriesPage() {
 
             {selectedCourse && (
               <div className="mb-4">
-                <h4 className="font-medium">Filtrer séries pour: {selectedCourse.name || selectedCourse.title}</h4>
-                <div className="flex gap-2 items-center mt-2">
-                  <label>Année:</label>
-                  <select value={year} onChange={e => setYear(e.target.value)} className="px-2 py-1 border rounded">
-                    <option value="2022">2022</option>
-                    <option value="2023">2023</option>
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                  </select>
+                <Card className="shadow-sm rounded-lg">
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-4">
+                      <Button variant="outline" size="icon" onClick={() => { setSelectedCourse(null); setSeriesOverview([]); }}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="text-2xl">{getSpecialtyIcon(selectedSpecialty || '')}</div>
+                      <div>
+                        <h4 className="font-semibold">{selectedCourse.name || selectedCourse.title} - Séries par Année</h4>
+                        <p className="text-sm text-muted-foreground">Facultés contenant des séries, regroupées par année</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <label>Faculté:</label>
-                  <select value={faculty} onChange={e => setFaculty(e.target.value)} className="px-2 py-1 border rounded">
-                    <option value="FMS">FMS</option>
-                    <option value="FMT">FMT</option>
-                    <option value="FMM">FMM</option>
-                    <option value="FMSf">FMSf</option>
-                  </select>
+                <div className="space-y-6 mt-4">
+                  {loading && seriesOverview.length === 0 ? (
+                    <div>Chargement...</div>
+                  ) : seriesOverview.length === 0 ? (
+                    <div>Aucune série disponible pour ce cours</div>
+                  ) : (
+                    seriesOverview.map(y => (
+                      <Card key={y.year} className="p-4">
+                        <CardContent>
+                          <div className="mb-3 flex items-center gap-3">
+                            <div className="rounded-full bg-slate-100 p-2">📅</div>
+                            <h5 className="font-medium">Année {y.year}</h5>
+                          </div>
 
-                  <Button onClick={loadSeriesForSelectedCourse}>Charger séries</Button>
+                          <div className="grid grid-cols-2 gap-4">
+                                    <div className="col-span-2">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        {y.faculties.map(f => (
+                                          <div key={f.faculty} className="p-4 border rounded flex items-center justify-between">
+                                            <div>
+                                              <div className="font-medium">{f.faculty}</div>
+                                              <div className="text-sm text-muted-foreground">{f.count} séries disponibles</div>
+                                            </div>
+                                            <div>
+                                              <Button size="sm" onClick={async () => {
+                                                setSelectedCourse({ ...selectedCourse, _loadGoal: { year: y.year, faculty: f.faculty } });
+                                                const s = await getSeriesByCourseYearFaculty(selectedCourse.name || selectedCourse.title, y.year, f.faculty);
+                                                setSeries(s);
+                                              }}>Explorer</Button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
                 </div>
 
-                <div className="mt-4">
-                  {loading ? (
-                    <div>Chargement séries...</div>
-                  ) : series.length === 0 ? (
-                    <div>Aucune série trouvée pour ces filtres</div>
-                  ) : (
-                    <div className="space-y-2">
+                {/* Si on a chargé des séries pour un couple year/faculty, les afficher */}
+                {series.length > 0 && (
+                  <div className="mt-4">
+                    <h5 className="font-medium">Séries</h5>
+                    <div className="space-y-2 mt-2">
                       {series.map(s => (
                         <div key={s.id} className="p-3 border rounded flex justify-between items-center">
                           <div>
@@ -389,8 +345,8 @@ export function SeriesPage() {
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -399,49 +355,67 @@ export function SeriesPage() {
         {/* -------- J2 -------- */}
         <TabsContent value="j2" className="space-y-4">
           <div>
-            <div className="mb-4">
-              <h3 className="font-medium">Spécialités (Jour 2)</h3>
-              {loading && specialties.length === 0 ? (
-                <div>Chargement...</div>
-              ) : (
-                <div className="space-y-4 mt-4">
-                  {specialtiesWithCount.map(spec => (
-                    <Card key={spec.name} className={`shadow-sm rounded-lg`} onClick={() => onSelectSpecialty(spec.name)}>
-                      <CardContent className="flex items-center justify-between p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="text-3xl">{getSpecialtyIcon(spec.name)}</div>
-                          <div>
-                            <h4 className="font-semibold">{spec.name}</h4>
-                            <div className="text-sm text-muted-foreground">{spec.count} cours</div>
+            {!selectedSpecialty && (
+              <div className="mb-4">
+                <h3 className="font-medium">Spécialités (Jour 2)</h3>
+                {loading && specialties.length === 0 ? (
+                  <div>Chargement...</div>
+                ) : specialtiesWithCount.length === 0 ? (
+                  <div>Aucune spécialité trouvée</div>
+                ) : (
+                  <div className="space-y-4 mt-4">
+                    {specialtiesWithCount.map(spec => (
+                      <Card key={spec.name} className={`shadow-sm rounded-lg`} onClick={() => onSelectSpecialty(spec.name)}>
+                        <CardContent className="flex items-center justify-between p-4">
+                          <div className="flex items-center gap-4">
+                            <div className="text-3xl">{getSpecialtyIcon(spec.name)}</div>
+                            <div>
+                              <h4 className="font-semibold">{spec.name}</h4>
+                              <div className="text-sm text-muted-foreground">{spec.count} cours</div>
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <Button variant="default">EXPLORER</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+                          <div>
+                            <Button variant="default">EXPLORER</Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {selectedSpecialty && (
               <div className="mb-4">
-                <h4 className="font-medium">{getSpecialtyIcon(selectedSpecialty)} {selectedSpecialty}</h4>
-                <p className="text-muted-foreground">Sélectionnez un cours pour voir les séries QCM disponibles</p>
+                <Card className="shadow-sm rounded-lg">
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-4">
+                      <Button variant="outline" size="icon" onClick={() => { setSelectedSpecialty(null); setCourses([]); setSeries([]); }}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="text-2xl">{getSpecialtyIcon(selectedSpecialty)}</div>
+                      <div>
+                        <h4 className="font-semibold">{selectedSpecialty}</h4>
+                        <p className="text-sm text-muted-foreground">Sélectionnez un cours pour voir les séries QCM disponibles</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <div className="space-y-3 mt-4">
                   {loading && courses.length === 0 ? (
                     <div>Chargement...</div>
+                  ) : courses.length === 0 ? (
+                    <div>Aucun cours trouvé pour cette spécialité</div>
                   ) : (
                     courses.map((course, idx) => (
                       <div key={course.id || idx} className="p-4 rounded-lg bg-white shadow-sm flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-md bg-slate-100 flex items-center justify-center text-sm font-semibold text-primary">{(course.id || idx + 1).toString().slice(0,2)}</div>
+                          <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold">{(idx + 1)}</div>
                           <div>{course.name || course.title}</div>
                         </div>
                         <div>
-                          <Button variant="default" onClick={() => onSelectCourse(course)}>EXPLORER <ChevronRight className="ml-2" /></Button>
+                          <Button variant="default" onClick={() => navigate(`/train/series/course/${course.id || course.key}`)}>EXPLORER <ChevronRight className="ml-2" /></Button>
                         </div>
                       </div>
                     ))

@@ -372,3 +372,22 @@ export async function getSeriesByCourseYearFaculty(courseName: string, year: str
   if (error) throw error;
   return data || [];
 }
+
+/**
+ * Retourne un aperçu des séries pour un cours donné: liste d'objets { year, faculty }
+ * Le regroupement/count se fait côté client pour garder la fonction simple.
+ */
+export async function getSeriesOverviewByCourse(courseName: string): Promise<{ year: string; faculty: string }[]> {
+  const { data, error } = await supabase
+    .from('qcm_series')
+    .select('year, faculty')
+    .eq('objective', courseName)
+    .order('year', { ascending: false });
+
+  if (error) {
+    console.error('getSeriesOverviewByCourse error', error);
+    throw error;
+  }
+
+  return data || [];
+}
