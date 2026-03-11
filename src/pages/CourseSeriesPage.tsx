@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
-import { getCourseById, getSeriesByCourseYearFaculty, getSeriesOverviewByCourse } from '@/supabaseService';
+import { ChevronLeft, HelpCircle, Book } from 'lucide-react';
+import { getCourseById, getSeriesByCourseYearFaculty, getSeriesOverviewByCourse, getQuestionsBySeriesId } from '@/supabaseService';
 
 export default function CourseSeriesPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -14,6 +14,7 @@ export default function CourseSeriesPage() {
   const [faculty, setFaculty] = useState('FMS');
   const [series, setSeries] = useState<any[]>([]);
   const [seriesOverview, setSeriesOverview] = useState<{ year: string; faculties: { faculty: string; count: number }[] }[]>([]);
+  const [selectedOverviewFilter, setSelectedOverviewFilter] = useState<{ year: string; faculty: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +78,8 @@ export default function CourseSeriesPage() {
 
   if (loading && !course) return <div className="p-6">Chargement...</div>;
   if (error && !course) return <div className="p-6 text-red-600">{error}</div>;
+  const totalQuestions = series.reduce((sum, x) => sum + (x._questionCount || 0), 0);
+  const avgQuestions = series.length ? Math.round(totalQuestions / series.length) : 0;
 
   return (
     <div className="space-y-6 p-4">
@@ -94,67 +97,133 @@ export default function CourseSeriesPage() {
         </CardContent>
       </Card>
 
-      {/* Overview: faculties grouped by year — shown immediately */}
+      {/* Overview or Series list (replace overview when a faculty is selected) */}
       <div className="space-y-6">
-        {loading && seriesOverview.length === 0 ? (
-          <div>Chargement...</div>
-        ) : seriesOverview.length === 0 ? (
-          <div className="text-muted-foreground">Aucune série disponible pour ce cours</div>
-        ) : (
-          seriesOverview.map(y => (
-            <Card key={y.year} className="p-4">
-              <CardContent>
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="rounded-full bg-slate-100 p-2">📅</div>
-                  <h5 className="font-medium">Année {y.year}</h5>
-                </div>
+        {!selectedOverviewFilter ? (
+          // Overview
+          loading && seriesOverview.length === 0 ? (
+            <div>Chargement...</div>
+          ) : seriesOverview.length === 0 ? (
+            <div className="text-muted-foreground">Aucune série disponible pour ce cours</div>
+          ) : (
+            seriesOverview.map(y => (
+              <Card key={y.year} className="p-4">
+                <CardContent>
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="rounded-full bg-slate-100 p-2">📅</div>
+                    <h5 className="font-medium">Année {y.year}</h5>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  {y.faculties.map(f => (
-                    <div key={f.faculty} className="p-4 border rounded flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{f.faculty}</div>
-                        <div className="text-sm text-muted-foreground">{f.count} séries disponibles</div>
-                      </div>
-                      <div>
-                        <Button size="sm" onClick={async () => {
+                  <div className="grid grid-cols-2 gap-4">
+                    {y.faculties.map(f => (
+                      <div
+                        key={f.faculty}
+                        className="p-4 border rounded flex items-center justify-between cursor-pointer hover:bg-slate-50"
+                        role="button"
+                        tabIndex={0}
+                        onClick={async () => {
+                          // set selected filter so we replace overview with series list
+                          setSelectedOverviewFilter({ year: y.year, faculty: f.faculty });
                           setLoading(true);
+                          setError(null);
                           try {
                             const s = await getSeriesByCourseYearFaculty(course!.name || course!.title, y.year, f.faculty);
-                            setSeries(s);
+                            // fetch question counts for each series
+                            const withCounts = await Promise.all(
+                              (s || []).map(async (ser: any) => {
+                                try {
+                                  const qs = await getQuestionsBySeriesId(ser.id);
+                                  return { ...ser, _questionCount: qs?.length || 0 };
+                                } catch (e) {
+                                  return { ...ser, _questionCount: 0 };
+                                }
+                              })
+                            );
+                            setSeries(withCounts);
                           } catch (e) {
                             console.error(e);
                             setError('Erreur lors du chargement des séries');
                           } finally {
                             setLoading(false);
                           }
-                        }}>Explorer</Button>
+                        }}
+                      >
+                        <div>
+                          <div className="font-medium">{f.faculty}</div>
+                          <div className="text-sm text-muted-foreground">{f.count} séries disponibles</div>
+                        </div>
+                        <div className="text-sm text-muted-foreground">Voir</div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )
+        ) : (
+          // Series list replacing overview
+          <div>
+            <Card>
+              <CardContent className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button variant="outline" size="icon" onClick={() => { setSelectedOverviewFilter(null); setSeries([]); }}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <h4 className="font-semibold">{course?.name || course?.title} — {selectedOverviewFilter.year} • {selectedOverviewFilter.faculty}</h4>
+                    <div className="text-sm text-muted-foreground">Séries disponibles</div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
 
-        {/* If series loaded for a faculty, show them here */}
-        {series.length > 0 && (
-          <div>
-            <h5 className="font-medium">Séries</h5>
-            <div className="space-y-3 mt-2">
-              {series.map(s => (
-                <div key={s.id} className="p-4 border rounded flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{s.objective}</div>
-                    <div className="text-sm text-muted-foreground">{s.faculty} — {s.year}</div>
-                  </div>
-                  <div>
-                    <Button onClick={() => navigate(`/series/${s.id}`)}>Explorer</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+              <div className="mt-4">
+                {loading ? (
+                  <div>Chargement séries...</div>
+                ) : series.length === 0 ? (
+                  <div className="text-muted-foreground">Aucune série trouvée pour ce filtre</div>
+                ) : (
+                  <>
+                    {/* Statistics block matching design */}
+                    <Card className="p-4 mb-4">
+                      <CardContent>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="rounded-full bg-slate-100 p-2">📊</div>
+                          <h5 className="font-medium">Statistiques - {course?.name || course?.title}</h5>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="rounded-lg bg-indigo-50 p-6 flex flex-col items-center">
+                            <div className="text-3xl font-semibold text-indigo-600">{series.length}</div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-2"><Book className="h-4 w-4 text-indigo-500" /><span>Séries disponibles</span></div>
+                          </div>
+
+                          <div className="rounded-lg bg-indigo-50 p-6 flex flex-col items-center">
+                            <div className="text-3xl font-semibold text-indigo-600">{avgQuestions}</div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-2"><HelpCircle className="h-4 w-4 text-red-500" /><span>Questions/série</span></div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <div className="space-y-3" data-series-list>
+                      {series.map(s => (
+                        <Card key={s.id} className="shadow-sm rounded-lg">
+                          <CardContent className="p-6 cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/series/${s.id}`)}>
+                            <div>
+                              <div className="font-medium text-lg mb-2">{s.objective}</div>
+                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                <HelpCircle className="h-4 w-4 text-red-500" />
+                                <span>{s._questionCount ?? 0} questions</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
           </div>
         )}
       </div>
