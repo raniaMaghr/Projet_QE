@@ -391,3 +391,58 @@ export async function getSeriesOverviewByCourse(courseName: string): Promise<{ y
 
   return data || [];
 }
+
+/**
+ * Récupère des questions en appliquant des filtres optionnels.
+ * Note: la fonction utilise quelques heuristiques (tags, type, relation qcm_series)
+ * pour appliquer les filtres disponibles côté base de données.
+ */
+export async function getQuestionsByFilters(filters: {
+  questionCount?: number;
+  status?: string[];
+  exams?: string[];
+  specialities?: string[];
+  subjects?: string[];
+  years?: string[];
+  faculties?: string[];
+  tags?: string[];
+  questionTypes?: string[];
+}): Promise<SupabaseQuestion[]> {
+  try {
+    let q: any = supabase.from('qcm_questions').select('*, qcm_series(*)');
+
+    if (filters.questionTypes && filters.questionTypes.length) {
+      q = q.in('type', filters.questionTypes);
+    }
+
+    if (filters.tags && filters.tags.length) {
+      // PostgreSQL array overlap operator via PostgREST => use overlaps
+      q = q.overlaps('tags', filters.tags);
+    }
+
+    // Try to filter by series metadata when provided
+    if (filters.years && filters.years.length) {
+      q = q.in('qcm_series.year', filters.years);
+    }
+    if (filters.faculties && filters.faculties.length) {
+      q = q.in('qcm_series.faculty', filters.faculties);
+    }
+
+    // Heuristic: subjects might be stored in `sub_course` or in tags
+    if (filters.subjects && filters.subjects.length) {
+      q = q.or(filters.subjects.map((s: string) => `sub_course.eq.${s}`).join(','));
+    }
+
+    // Limit
+    if (filters.questionCount) {
+      q = q.limit(filters.questionCount);
+    }
+
+    const { data, error } = await q.order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('getQuestionsByFilters error', err);
+    throw err;
+  }
+}

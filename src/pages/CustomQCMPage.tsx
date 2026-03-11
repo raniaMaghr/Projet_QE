@@ -1,6 +1,8 @@
-'use client';
+ 'use client';
 
 import { useState } from 'react';
+import { QCMEntry } from '@/types/qcm.types';
+import { getQuestionsByFilters, convertSupabaseQuestionToQCMEntry } from '@/supabaseService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -73,6 +75,11 @@ export function CustomQCMPage() {
   const [selectedFaculties, setSelectedFaculties] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>([]);
+
+  // Résultat généré
+  const [loadingSeries, setLoadingSeries] = useState(false);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
+  const [generatedQuestions, setGeneratedQuestions] = useState<QCMEntry[]>([]);
 
   // Données de référence
   const statusOptions = [
@@ -230,19 +237,40 @@ export function CustomQCMPage() {
   };
 
   const handleGenerateSeries = () => {
-    const config = {
-      questionCount: questionCount[0],
-      status: selectedStatus,
-      exams: selectedExams,
-      specialities: selectedSpecialities,
-      subjects: selectedSubjects,
-      years: selectedYears,
-      faculties: selectedFaculties,
-      tags: selectedTags,
-      questionTypes: selectedQuestionTypes,
-    };
-    console.log('Generating series with config:', config);
-    // TODO: Implémenter l'appel API pour générer la série
+    (async () => {
+      const config = {
+        questionCount: questionCount[0],
+        status: selectedStatus,
+        exams: selectedExams,
+        specialities: selectedSpecialities,
+        subjects: selectedSubjects,
+        years: selectedYears,
+        faculties: selectedFaculties,
+        tags: selectedTags,
+        questionTypes: selectedQuestionTypes,
+      };
+      setLoadingSeries(true);
+      setSeriesError(null);
+      setGeneratedQuestions([]);
+      try {
+        const data = await getQuestionsByFilters({
+          questionCount: config.questionCount,
+          years: config.years,
+          faculties: config.faculties,
+          tags: config.tags,
+          questionTypes: config.questionTypes,
+          subjects: config.subjects,
+        });
+
+        const converted = (data || []).map(convertSupabaseQuestionToQCMEntry);
+        setGeneratedQuestions(converted);
+      } catch (err: any) {
+        console.error('Error generating series', err);
+        setSeriesError(err?.message || String(err));
+      } finally {
+        setLoadingSeries(false);
+      }
+    })();
   };
 
   return (
@@ -681,6 +709,39 @@ export function CustomQCMPage() {
                   color="text-yellow-600"
                 />
               </div>
+            </CardContent>
+          </Card>
+        </div>
+        {/* Résultats générés */}
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Série Générée</CardTitle>
+              <p className="text-sm text-muted-foreground">Résultat selon vos filtres</p>
+            </CardHeader>
+            <CardContent>
+              {loadingSeries && <div>Chargement de la série...</div>}
+              {seriesError && (
+                <div className="text-red-600">Erreur: {seriesError}</div>
+              )}
+              {!loadingSeries && !seriesError && generatedQuestions.length === 0 && (
+                <div className="text-sm text-muted-foreground">Aucune question générée. Sélectionnez des filtres puis cliquez sur «Générer Série».</div>
+              )}
+
+              {!loadingSeries && generatedQuestions.length > 0 && (
+                <div className="space-y-4">
+                  {generatedQuestions.map((q) => (
+                    <div key={q.id} className="p-4 border rounded-lg">
+                      <div className="font-medium">{q.question}</div>
+                      <ul className="mt-2 list-disc list-inside text-sm">
+                        {q.options.map((opt, idx) => (
+                          <li key={idx}>{opt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
